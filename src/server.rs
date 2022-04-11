@@ -107,12 +107,16 @@ async fn static_assets(params: web::Path<String>) -> Result<actix_files::NamedFi
 
   let abs_path = format!("{public_dir}/{req_path}");
 
-  let mut named_file = actix_files::NamedFile::open(&abs_path)?;
 
   let mime = mime_guess::from_path(&req_path).first_or_text_plain().to_string();
 
   if mime == "text/html" {
-    let mut file = fs::read_to_string(&abs_path)?;
+    let mut file = match fs::read_to_string(&abs_path) {
+      Ok(f) => f,
+      Err(e) => format!(
+        r#"<pre style="word-wrap: break-word; white-space: pre-wrap;">{e}</pre>"#
+      )
+    };
 
     file = append_script(file);
 
@@ -121,9 +125,13 @@ async fn static_assets(params: web::Path<String>) -> Result<actix_files::NamedFi
     let mut f = fs::File::create(&fid)?;
     f.write_all(file.as_bytes())?;
 
-    named_file = actix_files::NamedFile::open(&fid)?;
+    let named_file = actix_files::NamedFile::open(&fid)?;
     fs::remove_file(&fid)?;
-  }
 
-  Ok(named_file)
+    Ok(named_file)
+  } else {
+    let named_file = actix_files::NamedFile::open(&abs_path)?;
+
+    Ok(named_file)
+  }
 }
