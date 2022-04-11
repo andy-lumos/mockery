@@ -5,15 +5,8 @@ use colored::Colorize;
 use std::path::PathBuf;
 
 use crate::PUBLIC_DIR;
-// use crate::WS_CLIENTS;
+use crate::ws::notify_ws;
 
-
-async fn broadcast() {
-  // let clients = WS_CLIENTS.lock().await;
-  // for (_, client) in clients.iter() {
-  //   client.send(Message::Text("".into())).await.unwrap();
-  // }
-}
 
 #[tokio::main]
 pub async fn watch() {
@@ -34,15 +27,15 @@ pub async fn watch() {
         match event {
           Write(path_buf) => {
             println!("[{:7}] {}", "UPDATE".blue(), get_rltv_path(path_buf).bright_black());
-            broadcast().await;
+            notify_ws().await;
           },
           Create(path_buf) => {
             println!("[{:7}] {}", "CREATE".blue(), get_rltv_path(path_buf).bright_black());
-            broadcast().await;
+            notify_ws().await;
           },
           Remove(path_buf) => {
             println!("[{:7}] {}", "REMOVE".blue(), get_rltv_path(path_buf).bright_black());
-            broadcast().await;
+            notify_ws().await;
           },
           Rename(from_buf, to_buf) => {
             println!(
@@ -51,7 +44,7 @@ pub async fn watch() {
               get_rltv_path(from_buf), 
               get_rltv_path(to_buf).bright_black()
             );
-            broadcast().await;
+            notify_ws().await;
           },
           Error(err, _) => println!("[ {} ] {err}", "ERROR".red()),
           _ => {}

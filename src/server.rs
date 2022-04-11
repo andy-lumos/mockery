@@ -9,7 +9,7 @@ use crate::MyResult;
 use crate::PUBLIC_DIR;
 use crate::HOST;
 use crate::PORT;
-// use crate::WS_CLIENTS;
+use crate::ws;
 
 pub async fn serve() -> MyResult<()> {
   let host = HOST.get().unwrap().to_owned();
@@ -23,7 +23,10 @@ async fn run_server(host: &str, port: &mut u16) -> MyResult<()> {
   loop {
     let server = HttpServer::new(
       || App::new()
-          // .route("/ws-mockery", web::get().to(handle_ws))
+          .route(
+            "/ws-mockery",
+            web::get().to(ws::start_ws_connection)
+          )
           .service(static_assets)
     );
     let p = port.to_owned();

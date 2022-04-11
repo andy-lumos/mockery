@@ -1,21 +1,26 @@
 use clap::{Command, Arg};
 use std::fs;
+use std::collections::HashMap;
 use local_ip_address::local_ip;
 use std::path::PathBuf;
 use colored::Colorize;
 use once_cell::sync::OnceCell;
 use std::thread;
-// use tokio::sync::Mutex;
+use tokio::sync::Mutex;
+use once_cell::sync::Lazy;
+use actix::Addr;
+use uuid::Uuid;
 
 
 mod server;
 mod watcher;
+mod ws;
 
 static PUBLIC_DIR: OnceCell<PathBuf> = OnceCell::new();
 static HOST: OnceCell<String> = OnceCell::new();
 static PORT: OnceCell<u16> = OnceCell::new();
-// static WS_CLIENTS: Lazy<Mutex<HashMap<Uuid, WebsocketContext<WS>>>>
-                      // = Lazy::new(|| Mutex::new(HashMap::new()));
+static WS_ACTORS: Lazy<Mutex<HashMap<Uuid, Addr<ws::WS>>>>
+                      = Lazy::new(|| Mutex::new(HashMap::new()));
 
 
 type MyResult<T> = Result<T, Box<dyn std::error::Error>>;
