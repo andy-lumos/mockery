@@ -1,56 +1,40 @@
-use tide::{self, listener::Listener, Server, Request, Response};
 use colored::Colorize;
 use uuid::Uuid;
+use std::io::Write;
 use std::{io, fs};
-use tide_websockets::WebSocket;
-use async_std::prelude::*;
+use actix_web::{get, web, App, HttpServer, Error};
+use actix_files;
 
 use crate::MyResult;
 use crate::PUBLIC_DIR;
 use crate::HOST;
 use crate::PORT;
-use crate::WS_CLIENTS;
-
+use crate::ws;
 
 pub async fn serve() -> MyResult<()> {
   let host = HOST.get().unwrap().to_owned();
   let mut port = PORT.get().unwrap().to_owned();
-  let mut listener = create_listener(host, &mut port).await;
 
-  listener.accept().await.unwrap();
-
-  Ok(())
+  run_server(&host, &mut port).await
 }
 
-fn create_server() -> Server<()> {
-  let mut server = tide::new();
-  server.at("/").get(static_assets);
-  server.at("/*").get(static_assets);
-  server.at("/ws-mockery").get(
-    WebSocket::new(
-      |_request, mut stream| async move {
-        let uid = Uuid::new_v4();
+async fn run_server(host: &str, port: &mut u16) -> MyResult<()> {
 
-        WS_CLIENTS.lock().await.insert(uid, stream.clone());
-        while let Some(Ok(_)) = stream.next().await {}
-        WS_CLIENTS.lock().await.remove(&uid);
-
-        Ok(())
-      }
-    )
-  );
-
-  server
-}
-
-async fn create_listener(host: String, port: &mut u16) -> impl Listener<()> {
   loop {
-    let server = create_server();
-
-    match server.bind(format!("{host}:{port}")).await {
-      Ok(listener) => {
+    let server = HttpServer::new(
+      || App::new()
+          .route(
+            "/ws-mockery",
+            web::get().to(ws::start_ws_connection)
+          )
+          .service(static_assets)
+    );
+    let p = port.to_owned();
+    match server.bind((host, p)) {
+      Ok(server) => {
         println!("[{}] Server is running at: http://{host}:{port}", "SUCCESS".green());
-        break listener;
+        server.run().await?;
+        break Ok(());
       },
       Err(e) => {
         match e.kind() {
@@ -101,37 +85,52 @@ fn append_script(mut file: String) -> String {
   file
 }
 
-async fn static_assets(req: Request<()>) -> tide::Result {
-  let public_dir = PUBLIC_DIR.get().unwrap().as_path().to_str().unwrap();
-  let req_path = req.url().path();
+#[get("/{filename:.*}")]
+async fn static_assets(params: web::Path<String>) -> Result<actix_files::NamedFile, Error> {
 
-  let req_path = if req_path.ends_with("/") { 
+  let req_path = params.to_string();
+
+  let public_dir = PUBLIC_DIR.get().unwrap().as_path().to_str().unwrap();
+  let req_path = if req_path.ends_with("/") || req_path == "" {
     format!("{req_path}index.html") 
   } else { 
     format!("{req_path}")
   };
 
-  let abs_path = format!("{public_dir}{req_path}");
+  let abs_path = format!("{public_dir}/{req_path}");
 
-  let mut file = match fs::read_to_string(abs_path) {
-    Ok(data) => {
-      println!("[{}] Get: {req_path}", "SUCCESS".green());
-      data
-    },
-    Err(_) => {
-      println!("[ {} ] Can not found: {req_path}", "ERROR".red());
-      format!("Can not Get {req_path}")
+  let mime = mime_guess::from_path(&req_path).first_or_text_plain().to_string();
+
+  if mime == "text/html" {
+    let mut file = match fs::read_to_string(&abs_path) {
+      Ok(data) => {
+        println!("[{}] Get: {req_path}", "SUCCESS".green());
+        data
+      },
+      Err(_) => {
+        println!("[ {} ] Can not found: {req_path}", "ERROR".red());
+        format!("Can not Get {req_path}")
+      }
+    };
+
+    file = append_script(file);
+
+    let fid = Uuid::new_v4().to_string() + "-" + req_path.as_str();
+
+    let mut f = fs::File::create(&fid)?;
+    f.write_all(file.as_bytes())?;
+
+    let named_file = actix_files::NamedFile::open(&fid)?;
+    fs::remove_file(&fid)?;
+
+    Ok(named_file)
+  } else {
+    match fs::metadata(&abs_path) {
+      Err(_) => println!("[ {} ] Can not found: {req_path}", "ERROR".red()),
+      _ => {}
     }
-  };
-
-  let mime = mime_guess::from_path(req_path).first_or_text_plain().to_string();
-
-  file = if mime == "text/html" {
-    append_script(file)
-  } else { file };
-
-  let mut res: Response = file.into();
-  res.set_content_type(mime.as_str());
-
-  Ok(res)
+    let named_file = actix_files::NamedFile::open(&abs_path)?;
+    println!("[{}] Get: {req_path}", "SUCCESS".green());
+    Ok(named_file)
+  }
 }
