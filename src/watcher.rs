@@ -3,19 +3,19 @@ use std::sync::mpsc::channel;
 use std::time::Duration;
 use colored::Colorize;
 use std::path::PathBuf;
-use tide_websockets::Message;
 
 use crate::PUBLIC_DIR;
-use crate::WS_CLIENTS;
+// use crate::WS_CLIENTS;
 
 
 async fn broadcast() {
-  let clients = WS_CLIENTS.lock().await;
-  for (_, client) in clients.iter() {
-    client.send(Message::Text("".into())).await.unwrap();
-  }
+  // let clients = WS_CLIENTS.lock().await;
+  // for (_, client) in clients.iter() {
+  //   client.send(Message::Text("".into())).await.unwrap();
+  // }
 }
 
+#[tokio::main]
 pub async fn watch() {
   let (tx, rx) = channel();
 

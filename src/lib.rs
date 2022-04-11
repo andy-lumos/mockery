@@ -3,13 +3,10 @@ use std::fs;
 use local_ip_address::local_ip;
 use std::path::PathBuf;
 use colored::Colorize;
-use once_cell::sync::{OnceCell, Lazy};
-use async_std::sync::Mutex;
-use async_std::task::block_on;
-use std::collections::HashMap;
-use uuid::Uuid;
-use tide_websockets::WebSocketConnection;
+use once_cell::sync::OnceCell;
 use std::thread;
+// use tokio::sync::Mutex;
+
 
 mod server;
 mod watcher;
@@ -17,8 +14,9 @@ mod watcher;
 static PUBLIC_DIR: OnceCell<PathBuf> = OnceCell::new();
 static HOST: OnceCell<String> = OnceCell::new();
 static PORT: OnceCell<u16> = OnceCell::new();
-static WS_CLIENTS: Lazy<Mutex<HashMap<Uuid, WebSocketConnection>>> 
-                      = Lazy::new(|| Mutex::new(HashMap::new()));
+// static WS_CLIENTS: Lazy<Mutex<HashMap<Uuid, WebsocketContext<WS>>>>
+                      // = Lazy::new(|| Mutex::new(HashMap::new()));
+
 
 type MyResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -28,15 +26,15 @@ pub struct Config {
   host: String,
 }
 
-pub fn run(config: Config) -> MyResult<()> {
+pub async fn run(config: Config) -> MyResult<()> {
 
   PUBLIC_DIR.set(config.target.clone()).unwrap();
   HOST.set(config.host).unwrap();
   PORT.set(config.port).unwrap();
 
-  thread::spawn(|| block_on(watcher::watch()));
+  thread::spawn(|| watcher::watch());
 
-  block_on(server::serve())?;
+  server::serve().await?;
 
   Ok(())
 }
