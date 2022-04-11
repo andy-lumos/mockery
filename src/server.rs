@@ -11,6 +11,7 @@ use crate::HOST;
 use crate::PORT;
 use crate::ws;
 
+
 pub async fn serve() -> MyResult<()> {
   let host = HOST.get().unwrap().to_owned();
   let mut port = PORT.get().unwrap().to_owned();
@@ -19,7 +20,6 @@ pub async fn serve() -> MyResult<()> {
 }
 
 async fn run_server(host: &str, port: &mut u16) -> MyResult<()> {
-
   loop {
     let server = HttpServer::new(
       || App::new()
@@ -103,10 +103,7 @@ async fn static_assets(params: web::Path<String>) -> Result<actix_files::NamedFi
 
   if mime == "text/html" {
     let mut file = match fs::read_to_string(&abs_path) {
-      Ok(data) => {
-        println!("[{}] Get: {req_path}", "SUCCESS".green());
-        data
-      },
+      Ok(data) => data,
       Err(_) => {
         println!("[ {} ] Can not found: {req_path}", "ERROR".red());
         format!("Can not Get {req_path}")
@@ -130,7 +127,7 @@ async fn static_assets(params: web::Path<String>) -> Result<actix_files::NamedFi
       _ => {}
     }
     let named_file = actix_files::NamedFile::open(&abs_path)?;
-    println!("[{}] Get: {req_path}", "SUCCESS".green());
+
     Ok(named_file)
   }
 }

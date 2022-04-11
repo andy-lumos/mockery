@@ -19,6 +19,8 @@ pub async fn watch() {
 
   watcher.watch(public_dir, RecursiveMode::Recursive).unwrap();
 
+  println!("[{}] Watcher is watching at {}", "SUCCESS".green(), public_dir);
+
   loop {
     use DebouncedEvent::*;
 
@@ -26,24 +28,24 @@ pub async fn watch() {
       Ok(event) => {
         match event {
           Write(path_buf) => {
-            println!("[{:7}] {}", "UPDATE".blue(), get_rltv_path(path_buf).bright_black());
+            println!("[{}] {}", "UPDATE".blue(), get_rltv_path(path_buf).bright_black());
             notify_ws().await;
           },
           Create(path_buf) => {
-            println!("[{:7}] {}", "CREATE".blue(), get_rltv_path(path_buf).bright_black());
+            println!("[{}] {}", "CREATE".blue(), get_rltv_path(path_buf).bright_black());
             notify_ws().await;
           },
           Remove(path_buf) => {
-            println!("[{:7}] {}", "REMOVE".blue(), get_rltv_path(path_buf).bright_black());
+            println!("[{}] {}", "REMOVE".blue(), get_rltv_path(path_buf).bright_black());
             notify_ws().await;
           },
           Rename(from_buf, to_buf) => {
-            println!(
-              "[{:7}] {} -> {}", 
-              "RENAME".blue(), 
+            let message = format!(
+              "{} -> {}", 
               get_rltv_path(from_buf), 
-              get_rltv_path(to_buf).bright_black()
+              get_rltv_path(to_buf)
             );
+            println!("[{}] {}", "RENAME".blue(), message.bright_black());
             notify_ws().await;
           },
           Error(err, _) => println!("[ {} ] {err}", "ERROR".red()),
