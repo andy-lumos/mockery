@@ -3,6 +3,7 @@ use std::sync::mpsc::channel;
 use std::time::Duration;
 use colored::Colorize;
 use std::path::PathBuf;
+use std::process;
 
 use crate::PUBLIC_DIR;
 use crate::ws::notify_ws;
@@ -17,7 +18,12 @@ pub async fn watch() {
   
   let public_dir = PUBLIC_DIR.get().unwrap().as_path().to_str().unwrap();
 
-  watcher.watch(public_dir, RecursiveMode::Recursive).unwrap();
+  let res = watcher.watch(public_dir, RecursiveMode::Recursive);
+
+  if let Err(e) = res {
+    println!("[ {} ] Failed to init watcher: {e}", "ERROR".red());
+    process::exit(-1);
+  }
 
   println!("[{}] Watcher is watching at {}", "SUCCESS".green(), public_dir);
 

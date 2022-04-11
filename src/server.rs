@@ -1,7 +1,7 @@
 use colored::Colorize;
 use uuid::Uuid;
 use std::io::Write;
-use std::{io, fs};
+use std::{io, fs, process};
 use actix_web::{get, web, App, HttpServer, Error};
 use actix_files;
 
@@ -44,6 +44,7 @@ async fn run_server(host: &str, port: &mut u16) -> MyResult<()> {
           },
           _ => {
             println!("[ {} ] Failed to bind {host}:{port} : {e}", "ERROR".red());
+            process::exit(-1);
           }
         }
       }
@@ -59,16 +60,23 @@ fn append_script(mut file: String) -> String {
       r#"<!-- The code below is injected by Mockery -->
       <script>
         let flag = false;
+        let init = true;
         function init_connection() {{
           const ws = new WebSocket("ws://{host}:{port}/ws-mockery");
           ws.onopen = () => {{
             console.log("[Mockery Server] Connection Established");
             flag = true;
+            if (!init) {{
+              location.reload();
+            }}
           }};
           ws.onmessage = () => location.reload();
           ws.onclose = () => {{
+            if (flag) {{
+              console.log("[Mockery Server] Connection Closed");
+            }}
             flag = false;
-            console.log("[Mockery Server] Connection Closed");
+            init = false;
           }};
         }}
         init_connection();
@@ -99,16 +107,12 @@ async fn static_assets(params: web::Path<String>) -> Result<actix_files::NamedFi
 
   let abs_path = format!("{public_dir}/{req_path}");
 
+  let mut named_file = actix_files::NamedFile::open(&abs_path)?;
+
   let mime = mime_guess::from_path(&req_path).first_or_text_plain().to_string();
 
   if mime == "text/html" {
-    let mut file = match fs::read_to_string(&abs_path) {
-      Ok(data) => data,
-      Err(_) => {
-        println!("[ {} ] Can not found: {req_path}", "ERROR".red());
-        format!("Can not Get {req_path}")
-      }
-    };
+    let mut file = fs::read_to_string(&abs_path)?;
 
     file = append_script(file);
 
@@ -117,17 +121,9 @@ async fn static_assets(params: web::Path<String>) -> Result<actix_files::NamedFi
     let mut f = fs::File::create(&fid)?;
     f.write_all(file.as_bytes())?;
 
-    let named_file = actix_files::NamedFile::open(&fid)?;
+    named_file = actix_files::NamedFile::open(&fid)?;
     fs::remove_file(&fid)?;
-
-    Ok(named_file)
-  } else {
-    match fs::metadata(&abs_path) {
-      Err(_) => println!("[ {} ] Can not found: {req_path}", "ERROR".red()),
-      _ => {}
-    }
-    let named_file = actix_files::NamedFile::open(&abs_path)?;
-
-    Ok(named_file)
   }
+
+  Ok(named_file)
 }
